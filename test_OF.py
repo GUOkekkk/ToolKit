@@ -4,7 +4,64 @@ import os
 from tqdm import tqdm
 
 
+# define a function to calculate the feature/corner optical flow
+def compute_corner_optical_flow(prev_image: np.ndarray, current_image: np.ndarray):
+    """
+    define a function to calculate the feature/corner optical flow
+    Args:
+        prev_image (np.ndarray): _description_
+        current_image (np.ndarray): _description_
+
+    Returns:
+        _type_: _description_
+    """
+    # params for ShiTomasi corner detection
+    feature_params = dict(maxCorners=100, qualityLevel=0.3, minDistance=7, blockSize=7)
+
+    # Parameters for lucas kanade optical flow
+    lk_params = dict(
+        winSize=(15, 15), maxLevel=2, criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03)
+    )
+
+    # Create some random colors
+    color = np.random.randint(0, 255, (100, 3))
+    # Take first frame and find corners in it
+    prev_image_gray = cv2.cvtColor(prev_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+    current_image_gray = cv2.cvtColor(current_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+
+    # Create a mask image for drawing purposes
+    mask = np.zeros_like(prev_image)
+
+    p0 = cv2.goodFeaturesToTrack(prev_image_gray, mask=None, **feature_params)
+    p1, st, err = cv2.calcOpticalFlowPyrLK(prev_image_gray, current_image_gray, p0, None, **lk_params)
+
+    # Select good points
+    if p1 is not None:
+        good_new = p1[st == 1]
+        good_old = p0[st == 1]
+
+    # draw the tracks
+    for i, (new, old) in enumerate(zip(good_new, good_old)):
+        a, b = new.ravel()
+        c, d = old.ravel()
+        mask = cv2.line(mask, (int(a), int(b)), (int(c), int(d)), color[i].tolist(), 2)
+        frame = cv2.circle(current_image, (int(a), int(b)), 5, color[i].tolist(), -1)
+    img = cv2.add(frame, mask)
+
+    return img
+
+
+# define a function to calculate the dense optical flow
 def compute_dense_optical_flow(prev_image: np.ndarray, current_image: np.ndarray):
+    """
+    define a function to calculate the dense optical flow
+    Args:
+        prev_image (np.ndarray): _description_
+        current_image (np.ndarray): _description_
+
+    Returns:
+        _type_: _description_
+    """
     old_shape = current_image.shape
     prev_image_gray = cv2.cvtColor(prev_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
     current_image_gray = cv2.cvtColor(current_image.astype(np.uint8), cv2.COLOR_BGR2GRAY)
@@ -115,15 +172,29 @@ if __name__ == "__main__":
     n_t = 1
 
     # ! Load the data from the tartanair dataset
-    imgs_l, depths_l, poses_l = tartan_data_loader(INITIAL_DIR, "left", 0, 220)  # the 300 has a good depth image
+    imgs_l, depths_l, poses_l = tartan_data_loader(INITIAL_DIR, "left", 0, 20)  # the 300 has a good depth image
     # <nums, 7> rotaiion vector in quaternion form, and we keep it during the whole process
 
     for i in range(len(imgs_l) - 1):
-        test_of = compute_dense_optical_flow(imgs_l[i], imgs_l[i + 1])
-        cv2.imshow("test", test_of)
-        keyValue = cv2.waitKey(100)
+        test_of = compute_dense_optical_flow(
+            imgs_l[i], imgs_l[i + 1]
+        )  # actually the performance of the dense is too bad
+        cv2.imshow("Desne Optical Flow", test_of.astype(np.uint8))
+        keyValue = cv2.waitKey(300)
 
         if keyValue & 0xFF == ord(" "):  # pause
             cv2.waitKey(0)
         elif keyValue & 0xFF == 27:  # quit
-            exit(0)
+            break
+
+    for i in range(len(imgs_l) - 1):
+        test_of = compute_corner_optical_flow(
+            imgs_l[i], imgs_l[i + 1]
+        )  # actually the performance of the dense is too bad
+        cv2.imshow("Corner Optical Flow", test_of.astype(np.uint8))
+        keyValue = cv2.waitKey(300)
+
+        if keyValue & 0xFF == ord(" "):  # pause
+            cv2.waitKey(0)
+        elif keyValue & 0xFF == 27:  # quit
+            break
