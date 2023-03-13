@@ -1,7 +1,14 @@
+# This is a evaluatioin/metrics tool of SLAM/VO performance, it contains the common metrics ATE, RPE, KITTI score
+# and one customized metric called the Success Rate to check the performance of the algorithm on one trajectory
+# Created by Ke GUO in 13/03/2023
+
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 import robot_transformation as robT
 import random
+
+# We assume the input pose or trajectory should be in the form of <n, 7> which means the rotation in the quaternion form
+
 
 # ==============================
 # Some useful functions
@@ -224,82 +231,6 @@ def align(model, data, calc_scale=False):
     return rot, trans, trans_error, s
 
 
-def shift0(traj):
-    """
-    Traj: a list of [t + quat]
-    Return: translate and rotate the traj
-    """
-    traj_ses = robT.pos_quats2SE(np.array(traj))
-    traj_init = traj_ses[0]
-    traj_init_inv = np.linalg.inv(traj_init)
-    new_traj = []
-    for tt in traj_ses:
-        ttt = traj_init_inv.dot(tt)
-        new_traj.append(robT.SE2pos_quat(ttt))
-    return np.array(new_traj)
-
-
-def pose2trans(pose_data):
-    data_size = len(pose_data)
-    trans = []
-    for i in range(0, data_size - 1):
-        tran = np.array(pose_data[i + 1][:3]) - np.array(pose_data[i][:3])  # np.linalg.inv(data[i]).dot(data[i+1])
-        trans.append(tran)
-
-    return np.array(trans)  # N x 3
-
-
-def rescale(poses_gt, poses):
-    """
-    similar to rescale
-    poses_gt/poses: N x 7 poselist in quaternion format
-    """
-    trans_gt = pose2trans(poses_gt)
-    trans = pose2trans(poses)
-
-    speed_square_gt = np.sum(trans_gt * trans_gt, 1)
-    speed_gt = np.sqrt(speed_square_gt)
-    speed_square = np.sum(trans * trans, 1)
-    speed = np.sqrt(speed_square)
-    # when the speed is small, the scale could become very large
-    # import ipdb;ipdb.set_trace()
-    mask = speed_gt > 0.0001  # * (speed>0.00001)
-    scale = np.mean((speed[mask]) / speed_gt[mask])
-    scale = 1.0 / scale
-    poses[:, 0:3] = poses[:, 0:3] * scale
-    return poses, scale
-
-
-def trajectory_transform(gt_traj, est_traj):
-    """
-    1. center the start frame to the axis origin
-    2. align the GT frame (NED) with estimation frame (camera)
-    """
-    gt_traj_trans = shift0(gt_traj)
-    est_traj_trans = shift0(est_traj)
-
-    # gt_traj_trans = ned2cam(gt_traj_trans)
-    # est_traj_trans = cam2ned(est_traj_trans)
-
-    return gt_traj_trans, est_traj_trans
-
-
-def transform_trajs(gt_traj, est_traj, cal_scale):
-    gt_traj, est_traj = trajectory_transform(gt_traj, est_traj)
-    if cal_scale:
-        est_traj, s = rescale(gt_traj, est_traj)
-        print("  Scale, {}".format(s))
-    else:
-        s = 1.0
-    return gt_traj, est_traj, s
-
-
-def quats2SEs(gt_traj, est_traj):
-    gt_SEs = robT.pos_quats2SE(gt_traj)
-    est_SEs = robT.pos_quats2SE(est_traj)
-    return gt_SEs, est_SEs
-
-
 # ===============================
 # ! ATE metrics
 class ATEEvaluator(object):
@@ -474,8 +405,8 @@ class TartanAirEvaluator:
             raise Exception("POSEFILE_FORMAT_ILLEGAL")
 
         # transform and scale
-        gt_traj_trans, est_traj_trans, s = transform_trajs(gt_traj, est_traj, scale)
-        gt_SEs, est_SEs = quats2SEs(gt_traj_trans, est_traj_trans)
+        gt_traj_trans, est_traj_trans, s = robT.transform_trajs(gt_traj, est_traj, scale)
+        gt_SEs, est_SEs = robT.quats2SEs(gt_traj_trans, est_traj_trans)
 
         ate_score, gt_ate_aligned, est_ate_aligned = self.ate_eval.evaluate(gt_traj, est_traj, scale)
         rpe_score = self.rpe_eval.evaluate(gt_SEs, est_SEs)
@@ -503,8 +434,8 @@ class TartanAirEvaluator:
             raise Exception("POSEFILE_FORMAT_ILLEGAL")
 
         # transform and scale
-        gt_traj_trans, est_traj_trans, s = transform_trajs(gt_traj, est_traj, scale)
-        gt_SEs, est_SEs = quats2SEs(gt_traj_trans, est_traj_trans)
+        gt_traj_trans, est_traj_trans, s = robT.transform_trajs(gt_traj, est_traj, scale)
+        gt_SEs, est_SEs = robT.quats2SEs(gt_traj_trans, est_traj_trans)
 
         ate_score, gt_ate_aligned, est_ate_aligned = self.ate_eval.evaluate(gt_traj, est_traj, scale)
         rpe_score = self.rpe_eval.evaluate(gt_SEs, est_SEs)
