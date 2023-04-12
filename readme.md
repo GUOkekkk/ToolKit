@@ -6,5 +6,5 @@ This is a repository to store some tool kits created by Ke for the future use.
 ### 4. _evaluation_tools.py_ is a evaluatioin/metrics tool of SLAM/VO performance, it contains the common metrics ATE, RPE, KITTI score and one customized metric called the Success Rate to check the performance of the algorithm on one trajectory, to use this module, the _robot_transformation.py_ module is necessary.
 ### 5. _icp.py_ is a icp module for the 2D icp
 ### 6. _draw_tools.py_ is a module to draw the trajectory for the camera pose, the result should be like this: 
-<img src="https://github.com/GUOkekkk/ToolKit/blob/main/draw_test.png" alt= “test_draw” width="400">
+<img src="https://github.com/GUOkekkk/ToolKit/blob/main/draw_test.png" alt= “test_draw” width="600">
 ### 7._dataloader.py_ is a module to load the data and now it only supports the tartanair_data
